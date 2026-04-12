@@ -42,6 +42,9 @@ supabase/.temp
 .vscode/
 .idea/
 
+# Claude Code local context
+.claude/
+
 # typescript
 *.tsbuildinfo
 

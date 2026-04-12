@@ -10,8 +10,9 @@
  * - 채용/거부 액션
  */
 
-import { Check, Star, User as UserIcon, X } from 'lucide-react-native';
+import { Check, Clock, Star, User as UserIcon, X } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
+import { useCountdown } from '@/shared/hooks';
 import { Application } from '@/shared/types';
 import {
   Button,
@@ -39,9 +40,65 @@ export function ApplicantCard({
   const isAccepted = a.status === 'accepted';
   const isRejected =
     a.status === 'rejected' || a.status === 'auto_cancelled';
+  const isExpired = a.status === 'expired';
+
+  const countdown = useCountdown(
+    a.status === 'pending' ? a.judgeDeadline : undefined
+  );
+  // 1분 이하 남으면 위험, 3분 이하면 경고
+  const urgency =
+    a.status === 'pending' && a.judgeDeadline
+      ? countdown.remainingMs <= 60_000
+        ? 'danger'
+        : countdown.remainingMs <= 180_000
+        ? 'warning'
+        : 'normal'
+      : 'normal';
 
   return (
-    <View style={[styles.container, isRejected && styles.containerRejected]}>
+    <View
+      style={[
+        styles.container,
+        (isRejected || isExpired) && styles.containerRejected,
+      ]}
+    >
+      {a.status === 'pending' && a.judgeDeadline && (
+        <View
+          style={[
+            styles.countdown,
+            urgency === 'warning' && styles.countdownWarning,
+            urgency === 'danger' && styles.countdownDanger,
+          ]}
+        >
+          <Clock
+            size={14}
+            color={
+              urgency === 'danger'
+                ? colors.semantic.error
+                : urgency === 'warning'
+                ? colors.semantic.warning
+                : colors.neutral[600]
+            }
+          />
+          <Text
+            variant="caption"
+            style={{
+              marginLeft: spacing[1],
+              color:
+                urgency === 'danger'
+                  ? colors.semantic.error
+                  : urgency === 'warning'
+                  ? colors.semantic.warning
+                  : colors.neutral[700],
+            }}
+          >
+            {countdown.expired
+              ? '만료됨'
+              : `${countdown.label} 내 판정해주세요`}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.head}>
         <View style={styles.avatar}>
           <UserIcon size={24} color={colors.neutral[0]} />
@@ -163,6 +220,19 @@ export function ApplicantCard({
           </Text>
         </View>
       )}
+
+      {isExpired && (
+        <View style={[styles.resultBanner, styles.resultBannerRejected]}>
+          <Clock size={16} color={colors.neutral[500]} />
+          <Text
+            variant="bodyM"
+            color="muted"
+            style={{ marginLeft: spacing[2] }}
+          >
+            판정 시간 만료 (자동 거부)
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -178,6 +248,21 @@ const styles = StyleSheet.create({
   },
   containerRejected: {
     opacity: 0.6,
+  },
+  countdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.neutral[100],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.full,
+  },
+  countdownWarning: {
+    backgroundColor: colors.semantic.warning + '22',
+  },
+  countdownDanger: {
+    backgroundColor: colors.semantic.error + '22',
   },
   head: {
     flexDirection: 'row',

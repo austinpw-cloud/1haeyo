@@ -5,9 +5,9 @@
  * docs/matching-system.md 참조.
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Users } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApplicantCard } from '@/features/matching';
 import { MOCK_EMPLOYER_ID, useMockData } from '@/shared/store';
@@ -22,7 +22,13 @@ import { formatRelativeTime } from '@/shared/utils';
 
 export default function MatchesScreen() {
   const router = useRouter();
-  const { jobs, applications, updateApplicationStatus } = useMockData();
+  const {
+    jobs,
+    applications,
+    updateApplicationStatus,
+    markApplicantsViewed,
+    expireOverdueApplications,
+  } = useMockData();
 
   const pendingGroups = useMemo(() => {
     const myJobs = jobs.filter(
@@ -38,6 +44,21 @@ export default function MatchesScreen() {
       }))
       .filter((g) => g.pending.length > 0);
   }, [jobs, applications]);
+
+  // 화면 진입 시 각 일감에 대해 "지원자 봤음" 기록 → 10분 타이머 시작
+  useFocusEffect(
+    useCallback(() => {
+      pendingGroups.forEach(({ job }) => markApplicantsViewed(job.id));
+    }, [pendingGroups, markApplicantsViewed])
+  );
+
+  // 5초마다 만료 체크
+  useEffect(() => {
+    const interval = setInterval(() => {
+      expireOverdueApplications();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [expireOverdueApplications]);
 
   return (
     <View style={styles.container}>

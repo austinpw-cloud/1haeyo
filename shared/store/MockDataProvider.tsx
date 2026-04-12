@@ -66,6 +66,45 @@ interface MockDataContextValue {
   getMyApplications: () => Application[];
   /** 지원 상태 변경 (채용/거부) */
   updateApplicationStatus: (id: string, status: ApplicationStatus) => void;
+
+  /**
+   * 사장님이 판정 화면을 열었음을 알림.
+   * 해당 일감의 pending 지원자들 중 아직 deadline 없는 건에
+   * 10분 판정 마감 시각을 세팅한다.
+   */
+  markApplicantsViewed: (jobId: string) => void;
+  /** 마감 초과한 pending 지원자 자동 expired 처리 */
+  expireOverdueApplications: () => void;
+
+  // --- 근무 라이프사이클 ---
+
+  /** 일손 측: 현장 도착 → 체크인 */
+  checkInJob: (jobId: string) => void;
+  /** 양측: 근무 완료 → 체크아웃 */
+  checkOutJob: (jobId: string) => void;
+  /** 리뷰 저장 (양방향) */
+  submitReview: (input: {
+    jobId: string;
+    from: 'worker' | 'employer';
+    rating: number;
+    comment?: string;
+  }) => void;
+  /** 특정 일감에 대한 리뷰 조회 */
+  getReview: (
+    jobId: string,
+    from: 'worker' | 'employer'
+  ) => Review | undefined;
+  /** 일감 시작 시각 도달 시 in_progress로 (데모용 수동 트리거) */
+  startJob: (jobId: string) => void;
+}
+
+export interface Review {
+  id: string;
+  jobId: string;
+  from: 'worker' | 'employer';
+  rating: number; // 1~5
+  comment?: string;
+  createdAt: string;
 }
 
 const MockDataContext = createContext<MockDataContextValue | null>(null);
@@ -96,6 +135,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<Application[]>(
     generateSeedApplications
   );
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   const createJob = useCallback((input: JobFormInput): Job => {
     const now = new Date();
@@ -266,6 +306,105 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const markApplicantsViewed = useCallback((jobId: string) => {
+    const deadline = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    setApplications((prev) =>
+      prev.map((a) =>
+        a.jobId === jobId && a.status === 'pending' && !a.judgeDeadline
+          ? { ...a, judgeDeadline: deadline }
+          : a
+      )
+    );
+  }, []);
+
+  const checkInJob = useCallback((jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId && j.status === 'confirmed'
+          ? { ...j, status: 'in_progress' }
+          : j
+      )
+    );
+  }, []);
+
+  const checkOutJob = useCallback((jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId && j.status === 'in_progress'
+          ? { ...j, status: 'completed' }
+          : j
+      )
+    );
+  }, []);
+
+  const submitReview = useCallback(
+    ({
+      jobId,
+      from,
+      rating,
+      comment,
+    }: {
+      jobId: string;
+      from: 'worker' | 'employer';
+      rating: number;
+      comment?: string;
+    }) => {
+      setReviews((prev) => {
+        // 같은 방향 중복 방지: 기존 게 있으면 덮어씀
+        const filtered = prev.filter(
+          (r) => !(r.jobId === jobId && r.from === from)
+        );
+        return [
+          ...filtered,
+          {
+            id: `review_${Date.now()}_${from}`,
+            jobId,
+            from,
+            rating,
+            comment,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      });
+    },
+    []
+  );
+
+  const getReview = useCallback(
+    (jobId: string, from: 'worker' | 'employer') =>
+      reviews.find((r) => r.jobId === jobId && r.from === from),
+    [reviews]
+  );
+
+  const startJob = useCallback((jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId && j.status === 'confirmed'
+          ? { ...j, status: 'in_progress' }
+          : j
+      )
+    );
+  }, []);
+
+  const expireOverdueApplications = useCallback(() => {
+    const now = Date.now();
+    setApplications((prev) => {
+      let changed = false;
+      const next = prev.map((a) => {
+        if (
+          a.status === 'pending' &&
+          a.judgeDeadline &&
+          new Date(a.judgeDeadline).getTime() <= now
+        ) {
+          changed = true;
+          return { ...a, status: 'expired' as const, judgedAt: new Date().toISOString() };
+        }
+        return a;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   const value = useMemo<MockDataContextValue>(
     () => ({
       jobs,
@@ -277,6 +416,13 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       getApplicationsForJob,
       getMyApplications,
       updateApplicationStatus,
+      markApplicantsViewed,
+      expireOverdueApplications,
+      checkInJob,
+      checkOutJob,
+      submitReview,
+      getReview,
+      startJob,
     }),
     [
       jobs,
@@ -288,6 +434,13 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       getApplicationsForJob,
       getMyApplications,
       updateApplicationStatus,
+      markApplicantsViewed,
+      expireOverdueApplications,
+      checkInJob,
+      checkOutJob,
+      submitReview,
+      getReview,
+      startJob,
     ]
   );
 
