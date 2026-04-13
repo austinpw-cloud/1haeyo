@@ -6,7 +6,8 @@ import { useRouter } from 'expo-router';
 import { Inbox } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { MOCK_EMPLOYER_ID, useMockData } from '@/shared/store';
+import { useAuth } from '@/shared/hooks';
+import { useMockData } from '@/shared/store';
 import { Job, JobStatus } from '@/shared/types';
 import {
   Card,
@@ -56,11 +57,12 @@ const statusConfig: Record<
 
 export default function EmployerHomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { jobs, getApplicationsForJob } = useMockData();
 
   const myJobs = useMemo(
-    () => jobs.filter((j) => j.employerId === MOCK_EMPLOYER_ID),
-    [jobs]
+    () => (user ? jobs.filter((j) => j.employerId === user.id) : []),
+    [jobs, user]
   );
 
   return (

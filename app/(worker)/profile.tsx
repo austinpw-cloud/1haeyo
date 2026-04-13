@@ -12,6 +12,7 @@ import {
   colors,
   ScreenHeader,
   spacing,
+  SupabaseStatusBadge,
   Text,
 } from '@/shared/ui';
 
@@ -48,6 +49,8 @@ export default function WorkerProfileScreen() {
         <Stat value="-" label="출석률" />
         <Stat value="0" label="뱃지" />
       </Card>
+
+      <SupabaseStatusBadge />
 
       <View style={styles.footer}>
         <Button variant="outline" size="lg" fullWidth onPress={handleLogout}>

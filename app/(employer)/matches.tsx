@@ -10,7 +10,8 @@ import { Users } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApplicantCard } from '@/features/matching';
-import { MOCK_EMPLOYER_ID, useMockData } from '@/shared/store';
+import { useAuth } from '@/shared/hooks';
+import { useMockData } from '@/shared/store';
 import {
   Button,
   colors,
@@ -22,6 +23,7 @@ import { formatRelativeTime } from '@/shared/utils';
 
 export default function MatchesScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const {
     jobs,
     applications,
@@ -31,8 +33,9 @@ export default function MatchesScreen() {
   } = useMockData();
 
   const pendingGroups = useMemo(() => {
+    if (!user) return [];
     const myJobs = jobs.filter(
-      (j) => j.employerId === MOCK_EMPLOYER_ID && j.status !== 'cancelled'
+      (j) => j.employerId === user.id && j.status !== 'cancelled'
     );
 
     return myJobs
@@ -43,7 +46,7 @@ export default function MatchesScreen() {
         ),
       }))
       .filter((g) => g.pending.length > 0);
-  }, [jobs, applications]);
+  }, [jobs, applications, user]);
 
   // 화면 진입 시 각 일감에 대해 "지원자 봤음" 기록 → 10분 타이머 시작
   useFocusEffect(

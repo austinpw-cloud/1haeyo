@@ -9,7 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RoleProvider } from '@/shared/hooks';
+import { AuthProvider, RoleProvider } from '@/shared/hooks';
 import { MockDataProvider } from '@/shared/store';
 
 // 폰트 로드 완료 전에 스플래시 자동 숨김 방지
@@ -34,22 +34,24 @@ export default function RootLayout() {
   }
 
   return (
-    <RoleProvider>
-      <MockDataProvider>
-        <SafeAreaProvider>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(worker)" />
-            <Stack.Screen name="(employer)" />
-            <Stack.Screen
-              name="job/[id]"
-              options={{ headerShown: true, title: '일감 상세' }}
-            />
-          </Stack>
-        </SafeAreaProvider>
-      </MockDataProvider>
-    </RoleProvider>
+    <AuthProvider>
+      <RoleProvider>
+        <MockDataProvider>
+          <SafeAreaProvider>
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(worker)" />
+              <Stack.Screen name="(employer)" />
+              <Stack.Screen
+                name="job/[id]"
+                options={{ headerShown: true, title: '일감 상세' }}
+              />
+            </Stack>
+          </SafeAreaProvider>
+        </MockDataProvider>
+      </RoleProvider>
+    </AuthProvider>
   );
 }

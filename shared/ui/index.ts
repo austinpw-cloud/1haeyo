@@ -13,4 +13,5 @@ export * from './Input';
 export * from './RoleSwitcher';
 export * from './ScreenHeader';
 export * from './StarRating';
+export * from './SupabaseStatusBadge';
 export * from './Text';

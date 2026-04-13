@@ -84,14 +84,18 @@ npx expo start
 
 ---
 
-## 현재 개발 상태
+## 현재 개발 상태 (2026-04-13)
 
 - ✅ Sprint 0: 프로젝트 셋업 + 디자인 시스템 + 폴더 구조
 - ✅ Sprint 1 (mock): 인증/라우팅 + 역할 분리 + 역할 전환
 - ✅ Sprint 2 (mock): 일감 CRUD + 지원/채용/거부
 - ✅ Sprint 3 (mock): 매칭 Mode 1/2 + 10분 판정 타이머
 - ✅ Sprint 4 (mock): 근무 라이프사이클 + 양방향 리뷰
-- ⏳ Sprint 5: Supabase 연동 (백엔드 전환)
+- ✅ **Phase 3A**: Supabase 연결 + 익명 인증
+- ✅ **Phase 3B**: Jobs CRUD → Supabase
+- ✅ **Phase 3C**: Applications → Supabase
+- ⏳ Phase 3D: Matches + Reviews → Supabase
+- ⏳ Phase 3E: Realtime 구독
 - ⏳ Sprint 6: 카카오 로그인 실제 연동
 - ⏳ Sprint 7: 지도 + GPS 실제 연동
 - ⏳ Sprint 8: 결제/정산 (PortOne)

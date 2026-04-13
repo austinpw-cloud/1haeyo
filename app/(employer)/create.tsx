@@ -71,7 +71,9 @@ export default function CreateJobScreen() {
     parseInt(hourlyRate, 10) >= 10030 &&
     parseInt(requiredCount, 10) >= 1;
 
-  const handleSubmit = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
     if (!isValid) {
       Alert.alert('입력 확인', '모든 칸을 채워주세요. 시급은 최저임금(10,030원) 이상이어야 해요.');
       return;
@@ -81,7 +83,9 @@ export default function CreateJobScreen() {
     const startAt = new Date();
     startAt.setHours(startAt.getHours() + preset.hoursOffset);
 
-    const job = createJob({
+    setSubmitting(true);
+    try {
+      const job = await createJob({
       title: title.trim(),
       category,
       location: location.trim(),
@@ -92,11 +96,19 @@ export default function CreateJobScreen() {
       urgent,
     });
 
-    Alert.alert(
-      '등록 완료',
-      `"${job.title}" 일감이 등록되었어요.`,
-      [{ text: '확인', onPress: () => router.replace('/(employer)') }]
-    );
+      Alert.alert(
+        '등록 완료',
+        `"${job.title}" 일감이 등록되었어요.`,
+        [{ text: '확인', onPress: () => router.replace('/(employer)') }]
+      );
+    } catch (e) {
+      Alert.alert(
+        '등록 실패',
+        e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -234,7 +246,8 @@ export default function CreateJobScreen() {
           size="lg"
           fullWidth
           onPress={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || submitting}
+          loading={submitting}
         >
           일감 등록하기
         </Button>

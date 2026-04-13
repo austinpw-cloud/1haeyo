@@ -26,12 +26,8 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApplicantCard } from '@/features/matching';
 import { ReviewModal } from '@/features/review';
-import { useRole } from '@/shared/hooks';
-import {
-  MOCK_EMPLOYER_ID,
-  MOCK_WORKER_ID,
-  useMockData,
-} from '@/shared/store';
+import { useAuth, useRole } from '@/shared/hooks';
+import { useMockData } from '@/shared/store';
 import { Application, CategoryLabel } from '@/shared/types';
 import {
   Button,
@@ -52,6 +48,7 @@ export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { role } = useRole();
+  const { user } = useAuth();
   const {
     getJob,
     applyToJob,
@@ -86,7 +83,7 @@ export default function JobDetailScreen() {
   }
 
   const totalPay = job.hourlyRate * job.durationHours;
-  const isOwnedByMe = job.employerId === MOCK_EMPLOYER_ID;
+  const isOwnedByMe = !!user && job.employerId === user.id;
   const showEmployerView = role === 'employer' && isOwnedByMe;
   const showWorkerView = role === 'worker';
   const myApplication = getMyApplications().find((a) => a.jobId === job.id);
@@ -112,16 +109,23 @@ export default function JobDetailScreen() {
     return () => clearInterval(interval);
   }, [showEmployerView, expireOverdueApplications]);
 
-  const handleApply = () => {
-    const result = applyToJob(job.id);
-    if (!result) {
-      Alert.alert('지원 실패', '이미 지원했거나 지원할 수 없는 상태에요.');
-      return;
-    }
-    if (job.matchingMode === 'instant') {
-      Alert.alert('지원했어요 ✓', '즉시 호출 모드입니다. 확정되면 알림이 옵니다.');
-    } else {
-      Alert.alert('지원했어요 ✓', '사장님이 확인하면 알림으로 알려드릴게요.');
+  const handleApply = async () => {
+    try {
+      const result = await applyToJob(job.id);
+      if (!result) {
+        Alert.alert('지원 실패', '이미 지원했거나 지원할 수 없는 상태에요.');
+        return;
+      }
+      if (job.matchingMode === 'instant') {
+        Alert.alert('지원했어요 ✓', '즉시 호출 모드입니다. 확정되면 알림이 옵니다.');
+      } else {
+        Alert.alert('지원했어요 ✓', '사장님이 확인하면 알림으로 알려드릴게요.');
+      }
+    } catch (e) {
+      Alert.alert(
+        '지원 실패',
+        e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.'
+      );
     }
   };
 
