@@ -2,9 +2,9 @@
  * 사장님 홈 — 내가 올린 일감 리스트.
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Inbox } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAuth } from '@/shared/hooks';
 import { useMockData } from '@/shared/store';
@@ -58,7 +58,15 @@ const statusConfig: Record<
 export default function EmployerHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { jobs, getApplicationsForJob } = useMockData();
+  const { jobs, getApplicationsForJob, refreshJobs, refreshApplications } =
+    useMockData();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshJobs();
+      refreshApplications();
+    }, [refreshJobs, refreshApplications])
+  );
 
   const myJobs = useMemo(
     () => (user ? jobs.filter((j) => j.employerId === user.id) : []),

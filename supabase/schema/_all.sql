@@ -1,5 +1,5 @@
 -- ============================================================================
--- _all.sql — 전체 스키마 한 번에 실행용
+-- _all.sql — 전체 스키마 한 번에 실행용 (신규 환경 부트스트랩)
 --
 -- Supabase Dashboard → SQL Editor 에 이 파일 전체 복붙 → Run.
 --
@@ -9,6 +9,9 @@
 --   3. applications (지원)
 --   4. matches + reviews (매칭 근무 기록 + 양방향 리뷰)
 --   5. RLS 정책
+--   6. Realtime publication (실시간 구독 테이블 등록)
+--   7. 익명 유저 기본 이름 (사용자 + UUID 6자리)
+--   8. contracts (전자 근로계약서) + 결제/정산 컬럼 + 워커 계좌 정보
 -- ============================================================================
 
 -- ============================================================================
@@ -317,5 +320,123 @@ create policy "매칭 참여자만 리뷰 작성"
   );
 
 -- ============================================================================
--- 완료. 테이블 5개 + RLS 정책 설치됨.
+-- 6. Realtime publication — 4개 테이블 변경사항을 WebSocket 브로드캐스트
+-- ============================================================================
+
+alter publication supabase_realtime add table public.applications;
+alter publication supabase_realtime add table public.jobs;
+alter publication supabase_realtime add table public.matches;
+alter publication supabase_realtime add table public.reviews;
+
+alter table public.applications replica identity full;
+alter table public.jobs replica identity full;
+alter table public.matches replica identity full;
+alter table public.reviews replica identity full;
+
+-- ============================================================================
+-- 7. 익명 사용자 기본 이름 (handle_new_user 덮어쓰기)
+-- ============================================================================
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data->>'display_name',
+      '사용자 ' || substr(new.id::text, 1, 6)
+    )
+  );
+  return new;
+end;
+$$;
+
+update public.profiles
+set display_name = '사용자 ' || substr(id::text, 1, 6)
+where display_name = '이름없음';
+
+-- ============================================================================
+-- 8. 전자 근로계약서 + 결제/정산 + 워커 계좌
+-- ============================================================================
+
+-- 프로필 계좌 필드
+alter table public.profiles
+  add column if not exists bank_name text,
+  add column if not exists bank_account_number text,
+  add column if not exists bank_account_holder text;
+
+-- jobs 결제/수수료 필드
+alter table public.jobs
+  add column if not exists platform_fee_rate numeric default 0.10,
+  add column if not exists pg_fee_rate numeric default 0.033,
+  add column if not exists worker_pay int,
+  add column if not exists platform_fee int,
+  add column if not exists pg_fee int,
+  add column if not exists total_amount_charged int,
+  add column if not exists escrow_status text default 'pending' check (
+    escrow_status in ('pending', 'held', 'released', 'refunded')
+  );
+
+-- contracts 테이블
+create table if not exists public.contracts (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  employer_id uuid not null references public.profiles(id) on delete cascade,
+  worker_id uuid not null references public.profiles(id) on delete cascade,
+
+  employer_signed_at timestamptz not null default now(),
+  employer_signed_ip text,
+  employer_signed_device text,
+
+  worker_signed_at timestamptz,
+  worker_signed_ip text,
+  worker_signed_device text,
+
+  contract_body jsonb not null,
+  content_hash text not null,
+  legal_status text default 'simple_consent' check (
+    legal_status in ('simple_consent', 'certified_identity', 'notarized')
+  ),
+
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+
+  unique (job_id, worker_id)
+);
+
+create index if not exists idx_contracts_job_id on public.contracts(job_id);
+create index if not exists idx_contracts_worker_id on public.contracts(worker_id);
+create index if not exists idx_contracts_employer_id on public.contracts(employer_id);
+
+drop trigger if exists set_updated_at on public.contracts;
+create trigger set_updated_at
+  before update on public.contracts
+  for each row execute function public.tg_set_updated_at();
+
+alter table public.contracts enable row level security;
+
+drop policy if exists "계약 당사자만 조회" on public.contracts;
+create policy "계약 당사자만 조회"
+  on public.contracts for select
+  using (auth.uid() = employer_id or auth.uid() = worker_id);
+
+drop policy if exists "계약 당사자만 생성" on public.contracts;
+create policy "계약 당사자만 생성"
+  on public.contracts for insert
+  with check (auth.uid() = employer_id or auth.uid() = worker_id);
+
+drop policy if exists "본인 서명만 업데이트" on public.contracts;
+create policy "본인 서명만 업데이트"
+  on public.contracts for update
+  using (auth.uid() = employer_id or auth.uid() = worker_id);
+
+alter publication supabase_realtime add table public.contracts;
+alter table public.contracts replica identity full;
+
+-- ============================================================================
+-- 완료. 테이블 6개 + RLS + Realtime + 트리거 설치됨.
 -- ============================================================================

@@ -5,9 +5,9 @@
  * Sprint 3에서 Supabase + GPS 거리 필터 연동 예정.
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Clock, Flame, MapPin, Wallet } from 'lucide-react-native';
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useMockData } from '@/shared/store';
 import { Job } from '@/shared/types';
@@ -27,7 +27,14 @@ import {
 
 export default function WorkerHomeScreen() {
   const router = useRouter();
-  const { jobs } = useMockData();
+  const { jobs, refreshJobs, refreshApplications } = useMockData();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshJobs();
+      refreshApplications();
+    }, [refreshJobs, refreshApplications])
+  );
 
   const availableJobs = useMemo(
     () =>

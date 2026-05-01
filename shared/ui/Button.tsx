@@ -32,7 +32,8 @@ export type ButtonVariant =
   | 'secondary'
   | 'outline'
   | 'ghost'
-  | 'kakao';
+  | 'kakao'
+  | 'google';
 export type ButtonSize = 'lg' | 'md' | 'sm';
 
 export interface ButtonProps extends Omit<PressableProps, 'style'> {
@@ -176,5 +177,13 @@ const variantStyles: Record<
   kakao: {
     container: { backgroundColor: '#FEE500' },
     text: { color: '#191919' },
+  },
+  google: {
+    container: {
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#DADCE0',
+    },
+    text: { color: '#3C4043' },
   },
 };

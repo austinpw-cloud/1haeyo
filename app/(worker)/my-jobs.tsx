@@ -2,9 +2,9 @@
  * 일손 내 일 화면 — 내가 지원한 일감 + 확정된 일감 내역.
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Briefcase } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useMockData } from '@/shared/store';
 import { Application, ApplicationStatus } from '@/shared/types';
@@ -28,7 +28,16 @@ const statusLabel: Record<ApplicationStatus, { text: string; color: string }> = 
 
 export default function WorkerMyJobsScreen() {
   const router = useRouter();
-  const { getMyApplications, getJob } = useMockData();
+  const { getMyApplications, getJob, refreshJobs, refreshApplications } =
+    useMockData();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshJobs();
+      refreshApplications();
+    }, [refreshJobs, refreshApplications])
+  );
+
   const myApps = getMyApplications();
 
   const items = useMemo(

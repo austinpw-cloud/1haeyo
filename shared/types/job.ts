@@ -54,6 +54,10 @@ export interface Job {
 
   /** 장소 표시명 (예: "미금역 OO식당") */
   location: string;
+  /** 위도 */
+  locationLat?: number;
+  /** 경도 */
+  locationLng?: number;
   /** 거리 표시 (mock: "1.2km") — 실제로는 GPS 계산 */
   distance?: string;
 
@@ -81,6 +85,8 @@ export interface JobFormInput {
   title: string;
   category: JobCategory;
   location: string;
+  locationLat?: number;
+  locationLng?: number;
   startAt: string;
   durationHours: number;
   hourlyRate: number;
