@@ -1,9 +1,9 @@
 # 구현 진행 상황
 
-> 스프린트별 완료/대기 현황 트래킹.
-> 전체 기술 설계는 [tech-architecture.md](tech-architecture.md), 매칭 플로우는 [matching-system.md](matching-system.md) 참조.
+> 현재 상태 단일 기준. 과거 변경 이력은 하단 **Log** 섹션.
+> 전체 기술 설계는 [tech-architecture.md](tech-architecture.md), 매칭 플로우는 [matching-system.md](matching-system.md), 결제/정산 모델은 [payment-model.md](payment-model.md).
 
-최종 업데이트: 2026-04-13
+최종 업데이트: 2026-04-14
 
 ---
 
@@ -11,230 +11,147 @@
 
 ```
 기반 레이어     ████████████████████  100%
-UI/기능 레이어  ████████████████████  100% (목 데이터로 검증 완료)
-백엔드 연동     █████████████░░░░░░░   65% (Jobs/Applications DB화 완료)
-외부 통합       ░░░░░░░░░░░░░░░░░░░░    0% (카카오/지도/결제)
-릴리즈 준비     ░░░░░░░░░░░░░░░░░░░░    0%
+UI/기능 레이어  ████████████████████  100% (모든 화면 구현 + 결제 mock UI)
+백엔드 연동     ████████████████████  100% (DB + RLS + Realtime)
+외부 통합       ████████░░░░░░░░░░░░   40% (지도 완료, 구글 로그인 완료, 실결제 대기)
+릴리즈 준비     ██░░░░░░░░░░░░░░░░░░   10% (EAS 빌드 파이프라인 확보)
 ```
 
 ---
 
-## Sprint 0 — 프로젝트 셋업 ✅ 완료
+## 완료된 것
 
-- Expo SDK 54 + TypeScript
-- 모듈화 폴더 구조 (features, shared, native, supabase)
-- TypeScript strict + 절대 경로 import (`@/shared/*`)
-- 디자인 토큰 (컬러/타이포/간격/그림자)
-- Pretendard 폰트 통합
-- Lucide 아이콘
+### 기반 · UI (Sprint 0~4)
+- Expo SDK 54 + TypeScript + Expo Router
+- 디자인 시스템 (컬러/타이포/간격/그림자, Pretendard)
 - 공용 컴포넌트 (Button, Card, Input, Text, ScreenHeader, StarRating, RoleSwitcher)
-- Git 저장소 + GitHub Private Repo
+- 역할 분리 (worker/employer 탭), 역할 전환
+- 일감 CRUD, 매칭 Mode 1/2, 근무 라이프사이클, 양방향 리뷰
+
+### Supabase 백엔드 (Phase 3A~3E)
+- Anonymous 인증 + Google OAuth linking (kakao는 비즈 앱 전환 대기)
+- DB: `profiles`, `jobs`, `applications`, `matches`, `reviews`, `contracts` + RLS
+- Realtime 구독 (4 테이블 + contracts)
+- 판정 타이머: 지원 접수 시점부터 10분 (사장님 앱 미접속해도 자동 만료)
+- 전역 sweep (15초): 만료 지원자 + 시작 시간 지난 공고 자동 정리
+
+### 지도 / GPS (Sprint 7 1~3)
+- 카카오맵 WebView + JS API
+- 주소/장소 통합 검색 (카카오 로컬 API)
+- 일감 등록 시 좌표 저장
+- 체크인 거리 검증 (150m, Haversine)
+
+### 공정성 / 근무 라이프사이클
+- 2명 채용 공고 시 requiredCount 도달까지 matching 유지
+- 체크아웃 게이트: 근무시간 × 95% 경과 전 비활성, "합의된 조기 종료" 별도 버튼
+- 익명 사용자 기본 이름 `사용자 XXXXXX`
+
+### 결제 / 정산 / 근로계약서 (UI/mock)
+- 비용 breakdown 카드 (근무 대가 + 플랫폼 10% + PG 3.3% + 총액)
+- 전자서명 체크박스 (사장님 등록 + 워커 지원)
+- 매칭 확정 시 `contracts` DB 자동 insert + "근로계약 체결됨" 배너
+- 근로계약서 모달 (고용노동부 표준양식 기반, 양측 서명 타임스탬프 + 해시 표기)
+- 체크아웃 시 `matches.payment_status → 'settled'` + 즉시송금 완료 Alert
+- 워커 프로필에 정산 계좌 등록 카드
+
+### 빌드 / 배포
+- EAS Build 파이프라인 (Android Preview APK)
+- EAS 환경변수로 Supabase/Kakao 키 주입
+- 구글 로그인 OAuth (Supabase provider)
 
 ---
 
-## Sprint 1 (mock) — 인증/라우팅 ✅ 완료
+## 대기 중인 작업
 
-- Expo Router + 라우팅 구조
-- 로그인 화면 (카카오 버튼 UI)
-- 역할 선택 화면 (일손 / 사장님)
-- 일손/사장님 탭 그룹 (주황/녹색 테마)
-- RoleSwitcher (역할 전환 토글)
-- RoleProvider (React Context)
+### Sprint 6 — 카카오 로그인 (홀딩)
+- 비즈 앱 전환 or "개인정보 동의항목" 검수 통과 필요 (account_email 권한)
+- 현재는 **구글 로그인**으로 대체
 
----
+### Sprint 7 4단계 — 백그라운드 GPS + 실시간 추적
+- `expo-location` Foreground Service
+- Realtime 채널로 워커 위치 송신
+- 사장님 지도에 워커 이동 표시
 
-## Sprint 2 (mock) — 일감 CRUD ✅ 완료
+### Sprint 8 — 실결제 연동
+**선행 조건 (사용자 작업)**:
+- 사업자등록 + 통신판매업 신고
+- PortOne 가입 (추천패키지 22만원 지원)
+- 토스페이먼츠 계약 (약 1~2주 심사)
 
-- MockDataProvider (메모리 스토어)
-- 일감 등록 폼
-- 리스트 + 상세 화면
-- 상태 전환 API
+**구현 범위**:
+- PortOne + 토스페이먼츠 연동
+- 에스크로 선결제 (mock → 실결제)
+- 즉시송금 API (mock → 실제 송금)
+- 휴업수당 계산 + 자동 지급
+- 취소/환불 자동 처리
 
----
+### Sprint 9 — 페널티 / 평판 시스템
+- 워커 페널티 포인트제 (지각/노쇼/취소)
+- 사장님 응답 지연 평판 하락 (현재 expired 기록만 남음)
+- 리뷰 → 프로필 집계 DB 트리거
 
-## Sprint 3 (mock) — 매칭 시스템 ✅ 완료
+### Sprint 10 — 법적 강화
+- 근로계약서 PASS/카카오/토스 인증 서명 (`legal_status = 'certified_identity'`)
+- KISA 공인 타임스탬프 (`legal_status = 'notarized'`)
+- PDF 생성 (expo-print)
+- 근로감독관 제출 포맷
+- 산재보험 연동
 
-- Mode 1 (즉시 호출) 자동 확정
-- Mode 2 (예약 구인) 판정 기반
-- 자동 경쟁자 시뮬레이션 (~~Phase 3C에서 제거됨~~)
-- 10분 판정 타이머 (사장님 화면 진입 기준)
-- 자동 만료 처리
-- 풍부한 지원자 카드
-
----
-
-## Sprint 4 (mock) — 근무 라이프사이클 ✅ 완료
-
-- confirmed → in_progress → completed
-- 체크인/체크아웃
-- 양방향 리뷰 모달
-- StarRating 컴포넌트
-
----
-
-## Phase 3A — Supabase 인증 ✅ 완료 (2026-04-13)
-
-- Supabase 프로젝트 생성 (Seoul region)
-- Project URL + publishable key → `.env` (gitignored)
-- `@supabase/supabase-js` + `@react-native-async-storage/async-storage` 설치
-- `shared/api/supabase.ts` 클라이언트
-- AsyncStorage로 세션 영속화
-- **Anonymous Sign-Ins** 활성화 (Manual linking도 ON)
-- `shared/hooks/useAuth.tsx` — AuthProvider + useAuth
-- 앱 시작 시 자동 익명 로그인
-- SupabaseStatusBadge 디버그 배지 (`sprint 6`에서 제거 예정)
-
-**확인**:
-- `auth.users` 테이블에 `is_anonymous=true` 유저 생성
-- `public.profiles` 테이블에 트리거로 자동 프로필 생성
-
----
-
-## Phase 3B — Jobs → Supabase ✅ 완료 (2026-04-13)
-
-- DB 스키마 전체 마이그레이션 실행 (5 테이블 + RLS)
-- `features/jobs/api/jobs.api.ts` — Supabase 쿼리 래핑
-- `fetchAllJobs`, `fetchJobById`, `insertJob`, `updateJobStatusDb`
-- MockDataProvider 내부에서 Jobs 관련 메서드만 Supabase로 전환
-- createJob → async, 호출부 await 적용
-- employer_id 필터링을 MOCK_EMPLOYER_ID → user.id로 교체
-- 자동 경쟁자 시뮬레이션 제거 (실 DB라 불필요)
-
-**확인**:
-- 일감 등록 시 Supabase jobs 테이블에 저장
-- 앱 재시작해도 유지
-- 양쪽 역할에서 조회 가능
-
----
-
-## Phase 3C — Applications → Supabase ✅ 완료 (2026-04-13)
-
-- `features/matching/api/applications.api.ts`
-  - `fetchApplicationsByJobId`, `fetchMyApplications`, `fetchAllVisibleApplications`
-  - `insertApplication` (프로필 스냅샷 포함)
-  - `updateApplicationStatusDb`, `markApplicationsViewedDb`
-  - `expireOverdueApplicationsDb`, `rejectOtherPendingForJob`
-- MockDataProvider의 Applications 메서드 전환
-- applyToJob → async, 호출부 await 적용
-- Mode 1/2 매칭 로직은 유지 (클라이언트 사이드)
-- 채용 시 같은 일감의 다른 pending들 자동 거부 (DB에서)
-
-**확인**:
-- 지원 시 Supabase applications 테이블에 row 생성
-- 앱 재시작해도 내 지원 이력 유지
-- RLS로 본인 + 일감 주인만 조회 가능
-
----
-
-## Phase 3D — Matches + Reviews → Supabase ⏳ 다음 진행
-
-| 항목 | 비고 |
-|---|---|
-| `features/matching/api/matches.api.ts` | 체크인/아웃, 취소 사유 등 |
-| `features/review/api/reviews.api.ts` | 양방향 리뷰 저장/조회 |
-| matches 테이블은 이미 DB에 있음 | 스키마 완성됨 |
-| reviews 테이블은 이미 DB에 있음 | 스키마 완성됨 |
-| MockDataProvider의 리뷰 state 제거 | 모두 DB로 |
-| 일감 완료 시 match 레코드 생성 로직 추가 | application_id와 연결 |
-
----
-
-## Phase 3E — Realtime 구독 ⏳ 대기
-
-- Supabase Realtime 채널
-- 새 지원자 들어올 때 사장님 화면 즉시 갱신
-- 지원 상태 변경 시 일손 화면 즉시 갱신
-- 워커 위치 스트리밍 (Sprint 7에서 GPS와 연동)
-
----
-
-## Sprint 6 — 카카오 로그인 실연동 ⏳ 대기
-
-- 카카오 개발자 앱 등록
-- `react-native-kakao` 설정
-- 익명 계정 → 카카오 계정 linking (manual linking 활용)
-- 기존 데이터 유지하며 업그레이드
-- SupabaseStatusBadge 제거
-
----
-
-## Sprint 7 — 지도 + GPS ⏳ 대기
-
-> 설계: 1~3단계는 독립적, 4단계는 Supabase Realtime 필요.
-
-- 1단계: 네이버 지도 WebView + 내 위치
-- 2단계: 일감 등록 시 주소 선택 + 좌표 저장
-- 3단계: 거리 기반 필터 + 체크인 검증
-- 4단계: 백그라운드 GPS + 실시간 추적 (Foreground Service)
-
----
-
-## Sprint 8 — 결제/정산 ⏳ 대기
-
-- PortOne + 토스페이먼츠
-- 에스크로 결제
-- 자동 정산
-- 휴업수당 계산
-
----
-
-## Sprint 9 — 릴리즈 준비 ⏳ 대기
-
-- 아이콘 + 스플래시
-- 개인정보 처리방침
+### Sprint 11 — 릴리즈 준비
+- 아이콘 · 스플래시 정식 제작
+- 개인정보 처리방침 · 이용약관 검토
 - Play Store 내부 테스트
+- iOS 빌드 (Apple Developer 계정 필요)
 
 ---
 
-## 현재 남은 기술 부채
+## 환경
+
+- **Supabase**: `nbjpivywvpvmwsltscai.supabase.co` (Seoul)
+- **DB**: 6 테이블 (profiles/jobs/applications/matches/reviews/contracts) + RLS + Realtime
+- **인증**: Anonymous + Google OAuth (Kakao 대기)
+- **지도**: 카카오맵 JS API (REST + JavaScript 키)
+- **빌드**: EAS Preview APK (`ilhaeyo` scheme)
+- **스키마 원본**: `supabase/schema/_all.sql` (신규 환경 부트스트랩용 — 개별 번호 파일들을 합친 것)
+
+---
+
+## 남은 기술 부채
 
 | 항목 | 메모 |
 |---|---|
-| MockDataProvider 이름 | Phase 3D 이후 DataProvider로 리네임 예정 |
-| MOCK_EMPLOYER_ID / MOCK_WORKER_ID export | 더 이상 사용 안 하지만 호환성 위해 남아있음. 정리 필요 |
-| SupabaseStatusBadge (프로필 화면) | Sprint 6 카카오 로그인 후 제거 |
-| 자동 경쟁자 시뮬레이션 | 제거됨. 다중 유저 테스트는 2기기 or 2계정 필요 |
-| Reviews 데이터 in-memory | Phase 3D에서 DB로 |
-| 일감 생성 시 matching_mode 계산 | 클라이언트 사이드에서 결정됨. DB 트리거로 이동 고려 |
+| MockDataProvider 이름 | DataProvider로 리네임 예정 |
+| MOCK_EMPLOYER_ID / MOCK_WORKER_ID export | 호환성 유지용. 정리 필요 |
+| 자동 경쟁자 시뮬레이션 제거 | 다중 유저 테스트는 2기기/2계정으로 |
+| 리뷰 → 프로필 집계 | DB 트리거로 worker_total_rating/rating_count 갱신 필요 |
+| 사장님 방치 평판 | Sprint 9 페널티와 함께 구현 |
+| 체크인 게이트 | 시작 30분 전부터만, 지각·노쇼 페널티. Sprint 9. |
+| Kakao 로그인 | 비즈 앱 전환 후 재개 |
 
 ---
 
-## Supabase 환경
+## Log
 
-- **Project URL**: `https://nbjpivywvpvmwsltscai.supabase.co`
-- **Project Ref**: `nbjpivywvpvmwsltscai`
-- **Region**: Northeast Asia (Seoul)
-- **Key 타입**: Publishable key (신규 형식)
-- **키 저장**: `.env` (gitignored), `EXPO_PUBLIC_` 접두사로 클라이언트 노출
-- **DB 테이블**: `profiles`, `jobs`, `applications`, `matches`, `reviews` (모두 RLS 활성)
-- **Auth**: Anonymous Sign-ins 활성화, Manual linking 활성화
-- **스키마 SQL 원본**: `supabase/schema/_all.sql`
+### 2026-04-14
+- 결제/정산/근로계약 UI mock 선구현: 비용 breakdown, 전자서명 체크박스, 계약 자동 체결, 즉시송금 mock, 계좌 등록.
+- DB: `contracts` 테이블 추가 + 결제/수수료 필드 + 워커 계좌 필드 (`008_contracts_and_payout.sql`).
+- `_all.sql`에 006/007/008 병합 (신규 환경 한 번에 부트스트랩 가능).
+- 체크인 위치 검증 race 수정: `useCurrentLocation.refresh()`가 point 반환.
+- 매칭 확정 시 `insertContract` 자동 실행 (양측 서명 + 해시 포함).
+- checkout 시 `matches.payment_status = 'settled'` 전환.
+- 프로필 화면 중복 카드 제거 (AccountInfo로 일원화).
+- README / tech-architecture 상태 갱신.
 
----
+### 2026-04-13
+- Phase 3A~3E 완료 (Supabase 인증/Jobs/Applications/Matches/Reviews/Realtime).
+- Sprint 7 1~3단계 (카카오맵 WebView + 주소 검색 + 체크인 거리 검증).
+- 판정 타이머 기준을 "지원 접수 시점"으로 변경 (사장님 앱 미접속 무한 pending 구멍 수정).
+- 채용 플로우: requiredCount 도달까지 matching 유지.
+- 체크아웃 게이트 (근무시간 × 95% 경과).
+- 익명 로그인 기본 이름 `사용자 XXXXXX`.
+- 구글 로그인 실연동 (Supabase OAuth + identity 충돌 fallback).
+- EAS Build 파이프라인 구축 (Android Preview APK).
+- 스킴 `1haeyo` → `ilhaeyo` 변경 (RFC 호환).
 
-## 의사결정 기록
-
-### 최근 결정 (Phase 3)
-
-- **익명 로그인으로 시작** — 카카오 로그인은 Sprint 6. 지금은 기능 테스트 우선.
-- **Mock state + Supabase 혼용 기간 허용** — 한 번에 다 바꾸지 않고 단계적 전환
-- **RLS는 켜서 시작** — 마이그레이션 하면서 보안 구멍 안 만드는 게 나중이 편함
-- **자동 경쟁자 제거** — 실 DB에선 가짜 user_id 만들기 어려움. Mock 유지하면 혼란만 가중
-
-### 지속되는 원칙
-
-- 단일 앱 + 역할 전환 (일손 / 사장님)
-- 네이티브 앱 (PWA X)
-- 표현은 한국어 UI / 영어 코드
-- 10분 판정 타이머는 사장님 화면 진입 기준
-- 시니어 친화 (18pt+, 48dp+, 푸른색 최소)
-
----
-
-## 다음 할 일
-
-1. Phase 3D: Matches + Reviews → Supabase
-2. Phase 3E: Realtime 구독
-3. 지도 1~3단계 (Sprint 7 일부)
-4. Supabase 인프라 최적화 (인덱스, 함수)
-5. 카카오 로그인 (Sprint 6)
+### 2026-04-12
+- Sprint 0~4 mock 완료. UI/UX 검증.

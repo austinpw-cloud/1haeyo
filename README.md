@@ -29,15 +29,16 @@
 
 ## 기술 스택
 
-| 레이어 | 기술 |
-|---|---|
-| 모바일 | Expo Managed Workflow + React Native + TypeScript |
-| 백엔드/DB | Supabase (예정, 현재 목 데이터) |
-| 인증 | 카카오 로그인 (예정) |
-| 지도 | 네이버 지도 WebView (예정) |
-| GPS | expo-location + Foreground Service (예정) |
-| 결제 | PortOne + 토스페이먼츠 (예정) |
-| OTA | EAS Update |
+| 레이어 | 기술 | 상태 |
+|---|---|---|
+| 모바일 | Expo Managed Workflow + React Native + TypeScript | ✅ |
+| 백엔드/DB | Supabase + RLS + Realtime | ✅ |
+| 인증 | Google OAuth (카카오는 비즈 앱 전환 후) | ✅ / ⏳ |
+| 지도 | 카카오맵 WebView + JS API | ✅ |
+| GPS | expo-location (foreground 체크인 검증) | ✅ 기본 완료 / 4단계 백그라운드 추적 ⏳ |
+| 결제 | PortOne + 토스페이먼츠 | ⏳ UI mock 완료, 실연동은 사업자등록 후 |
+| 배포 | EAS Build (Android Preview APK) | ✅ |
+| OTA | EAS Update | ⏳ 예정 |
 
 ---
 
@@ -65,43 +66,47 @@ npx expo start
 │   └── job/[id].tsx    # 일감 상세 (동적 라우트)
 │
 ├── features/           # 기능별 모듈
-│   ├── matching/       # ApplicantCard
-│   ├── review/         # ReviewModal
-│   └── ...
+│   ├── jobs/           # 일감 CRUD + 가격 breakdown + 시작시간 picker
+│   ├── matching/       # 지원/매칭/체크인·아웃 (applications, matches)
+│   ├── location/       # 카카오맵 WebView + 주소검색 + GPS 거리 검증
+│   ├── review/         # 양방향 리뷰 모달
+│   ├── contract/       # 전자 근로계약서 (표준양식 + 해시)
+│   └── profile/        # 계정 정보 + 계좌 등록 + 업그레이드 카드
 │
 ├── shared/             # 공용 레이어
-│   ├── ui/             # 디자인 토큰 + Button/Card/Input/Text 등
-│   ├── hooks/          # useRole, useCountdown
-│   ├── store/          # MockDataProvider (목 데이터)
+│   ├── api/            # supabase 클라이언트, OAuth 래퍼
+│   ├── ui/             # 디자인 토큰 + 공용 컴포넌트
+│   ├── hooks/          # useAuth, useRole, useCountdown
+│   ├── store/          # MockDataProvider (전역 상태 + Realtime 구독)
 │   ├── types/          # 공용 타입
-│   └── utils/          # 포맷 유틸
+│   └── utils/          # 포맷, 가격 계산
 │
-├── native/             # 네이티브 플러그인 래퍼 (예정)
-├── supabase/           # DB 스키마 + Edge Functions (예정)
+├── supabase/
+│   └── schema/         # 6개 테이블 + RLS + Realtime publication (_all.sql)
+│
 ├── assets/             # 폰트, 이미지
-└── docs/               # 기획/설계 문서
+└── docs/               # 기획·설계·진행 문서
 ```
 
 ---
 
-## 현재 개발 상태 (2026-04-13)
+## 현재 개발 상태 (2026-04-14)
 
-- ✅ Sprint 0: 프로젝트 셋업 + 디자인 시스템 + 폴더 구조
-- ✅ Sprint 1 (mock): 인증/라우팅 + 역할 분리 + 역할 전환
-- ✅ Sprint 2 (mock): 일감 CRUD + 지원/채용/거부
-- ✅ Sprint 3 (mock): 매칭 Mode 1/2 + 10분 판정 타이머
-- ✅ Sprint 4 (mock): 근무 라이프사이클 + 양방향 리뷰
-- ✅ **Phase 3A**: Supabase 연결 + 익명 인증
-- ✅ **Phase 3B**: Jobs CRUD → Supabase
-- ✅ **Phase 3C**: Applications → Supabase
-- ⏳ Phase 3D: Matches + Reviews → Supabase
-- ⏳ Phase 3E: Realtime 구독
-- ⏳ Sprint 6: 카카오 로그인 실제 연동
-- ⏳ Sprint 7: 지도 + GPS 실제 연동
-- ⏳ Sprint 8: 결제/정산 (PortOne)
-- ⏳ Sprint 9: Play Store 베타 릴리즈
+- ✅ Sprint 0~4: 기반, UI, 목 데이터 라이프사이클 (등록/지원/매칭/체크인/리뷰)
+- ✅ **Phase 3A~3E**: Supabase 전체 연동 (인증 + 6개 테이블 + Realtime)
+- ✅ **Sprint 7 1~3단계**: 카카오맵 + 주소 검색 + 체크인 거리 검증
+- ✅ **구글 로그인 실연동** (Supabase OAuth)
+- ✅ **공정성 게이팅**: 판정 타이머(지원 접수 기준), 채용 플로우(requiredCount 유지), 체크아웃 게이트(95% 경과)
+- ✅ **결제/정산/근로계약 UI mock**: 비용 breakdown, 전자서명 체크박스, 계약 자동 체결, 즉시송금, 계좌 등록
+- ✅ **EAS Build**: Android Preview APK 파이프라인
+- ⏳ Sprint 6: 카카오 로그인 (비즈 앱 전환 대기)
+- ⏳ Sprint 7 4단계: 백그라운드 GPS + 실시간 추적
+- ⏳ Sprint 8: 실결제 (PortOne + 토스페이먼츠) — 사업자등록 선행
+- ⏳ Sprint 9: 페널티/평판 시스템
+- ⏳ Sprint 10: 근로계약서 공인 서명 (PASS/KISA)
+- ⏳ Sprint 11: Play Store 릴리즈
 
-상세 내용은 [docs/progress.md](docs/progress.md) 참조.
+상세 내용은 [docs/progress.md](docs/progress.md), 결제 모델은 [docs/payment-model.md](docs/payment-model.md) 참조.
 
 ---
 

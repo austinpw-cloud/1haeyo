@@ -5,7 +5,7 @@
 
 ---
 
-## 현재 구현 상태 요약 (2026-04-13)
+## 현재 구현 상태 요약 (2026-04-14)
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -16,18 +16,24 @@
 | 라우팅 | ✅ 완료 | Expo Router, 역할 기반 분기 |
 | 역할 시스템 | ✅ 완료 | 일손 / 사장님 + 전환 |
 | Supabase 연결 | ✅ 완료 | 프로젝트 생성, 클라이언트 셋업 |
-| DB 스키마 | ✅ 완료 | 5 테이블 + RLS 정책 |
-| 익명 인증 | ✅ 완료 | Sprint 6에서 카카오로 업그레이드 예정 |
+| DB 스키마 | ✅ 완료 | 6 테이블 (+contracts) + RLS 정책 |
+| 익명 인증 | ✅ 완료 | 앱 시작 시 자동 익명 로그인 |
+| 구글 로그인 | ✅ 완료 | Supabase OAuth + identity linking |
+| 카카오 로그인 | ⏳ 홀딩 | 비즈 앱 전환 or account_email 검수 통과 필요 |
 | 일감 CRUD | ✅ Supabase | 실 DB 연동 완료 |
 | 지원(Applications) | ✅ Supabase | 실 DB 연동 완료 |
-| 매칭 Mode 1/2 | ✅ 완료 | 클라이언트 로직 + DB |
-| 10분 판정 타이머 | ✅ 완료 | DB + 클라이언트 타이머 |
-| 근무 라이프사이클 | ⚠️ 혼합 | 일감 상태는 DB, 리뷰는 메모리 |
-| Realtime 구독 | ⏳ 대기 | Phase 3E |
-| 카카오 로그인 (실) | ⏳ 대기 | Sprint 6 |
-| 지도 + GPS | ⏳ 대기 | Sprint 7 |
-| 결제 (PortOne) | ⏳ 대기 | Sprint 8 |
-| 릴리즈 | ⏳ 대기 | Sprint 9 |
+| 매칭/리뷰 | ✅ Supabase | matches + reviews 실 DB |
+| Realtime 구독 | ✅ 완료 | 4+1 테이블 WebSocket 라이브 동기화 |
+| 판정 타이머 | ✅ 완료 | 지원 접수 기준 + 전역 sweep |
+| 체크아웃 게이트 | ✅ 완료 | 근무시간 × 95% 경과 전 비활성 |
+| 카카오맵 / 거리검증 | ✅ 완료 | Sprint 7 1~3단계 |
+| 전자 근로계약서 | ✅ 완료 (simple_consent) | `contracts` DB + 양측 서명 + 해시 |
+| 결제/정산 UI mock | ✅ 완료 | breakdown, 즉시송금, 계좌 등록 |
+| 실결제 (PortOne) | ⏳ Sprint 8 | 사업자등록 · 통신판매업 신고 선행 |
+| 백그라운드 GPS 추적 | ⏳ Sprint 7 4단계 | Foreground Service + Realtime |
+| 페널티/평판 | ⏳ Sprint 9 | 포인트제 + 사장님 응답 평판 |
+| 공인 서명 (PASS/KISA) | ⏳ Sprint 10 | legal_status 강화 |
+| 릴리즈 | ⏳ Sprint 11 | Play Store 내부 테스트 → 공개 |
 
 ---
 
@@ -39,8 +45,8 @@
 |---|---|---|
 | **모바일** | Expo Managed Workflow + React Native + TypeScript | 단일 코드베이스, 한국 생태계 지원, Claude Code 적합 |
 | **백엔드/DB** | Supabase (PostgreSQL) | Realtime, 인증, 스토리지 통합. Expo 공식 가이드 |
-| **인증** | 카카오 로그인 (`react-native-kakao`) + Supabase Auth | 한국 사용자 대부분 카카오 |
-| **지도** | 네이버 지도 WebView (MVP) → 네이티브 SDK (v2) | 한국 데이터 정확, 단계적 고도화 |
+| **인증** | Supabase OAuth (Google 런칭 / Kakao 비즈앱 후) + 익명 linking | 현재는 Google이 기본, Kakao는 준비됨 |
+| **지도** | 카카오맵 WebView + JS API (MVP) → 네이티브 SDK (v2) | 개인 개발자 가입 진입장벽 낮음, 한국 데이터 양호 |
 | **GPS/백그라운드** | `expo-location` + Foreground Service | 배민 수준 추적 가능, 무료 |
 | **푸시** | Expo Notifications + FCM | 표준, 안정적 |
 | **결제/정산** | PortOne(`@portone/react-native-sdk`) + 토스페이먼츠 | 공식 RN SDK, 한국 PG 통합 |
@@ -97,77 +103,74 @@
 
 ## 4. 모듈화 아키텍처
 
-### 폴더 구조
+### 폴더 구조 (실제 트리, 2026-04-14 기준)
 
 ```
 1haeyo/
-├── app/                          # Expo Router (라우팅)
-│   ├── (auth)/                   # 인증 전 화면
-│   ├── (worker)/                 # 워커 전용 탭
-│   ├── (employer)/               # 구인자 전용 탭
+├── app/                            # Expo Router
+│   ├── (auth)/                     # 로그인·역할 선택
+│   │   ├── login.tsx
+│   │   └── role-select.tsx
+│   ├── (worker)/                   # 일손 탭
+│   │   ├── index.tsx  my-jobs.tsx  profile.tsx
+│   ├── (employer)/                 # 사장님 탭
+│   │   ├── index.tsx  create.tsx  matches.tsx  profile.tsx
+│   ├── job/[id].tsx                # 일감 상세 (동적 라우트)
 │   └── _layout.tsx
 │
-├── features/                     # 기능별 모듈 (핵심)
-│   ├── auth/
-│   │   ├── screens/
-│   │   ├── hooks/
-│   │   ├── api/
-│   │   ├── types/
-│   │   └── index.ts
-│   ├── profile/
-│   ├── jobs/
-│   ├── matching/                 # Mode 1, Mode 2 로직
-│   │   ├── screens/
-│   │   ├── hooks/
-│   │   │   ├── useInstantMatch.ts   # Mode 1
-│   │   │   └── useScheduledMatch.ts # Mode 2
-│   │   ├── api/
-│   │   └── state-machine.ts
-│   ├── location/                 # GPS, 지도, 체크인
-│   ├── payment/                  # PortOne 정산
-│   ├── review/                   # 별점, 뱃지
-│   ├── penalty/                  # 페널티 시스템
-│   └── notification/             # 푸시
+├── features/                       # 기능별 모듈
+│   ├── jobs/                       # 일감 등록/조회
+│   │   ├── api/jobs.api.ts
+│   │   └── components/PricingBreakdown.tsx, StartDateTimePicker.tsx
+│   ├── matching/                   # 지원/매칭 (Mode 1, Mode 2)
+│   │   ├── api/applications.api.ts, matches.api.ts
+│   │   └── ApplicantCard.tsx
+│   ├── location/                   # 카카오맵 + GPS
+│   │   ├── KakaoMapView.tsx
+│   │   ├── AddressPicker.tsx
+│   │   ├── api/geocoding.ts
+│   │   └── hooks/useCurrentLocation.ts
+│   ├── review/                     # 양방향 리뷰
+│   │   ├── ReviewModal.tsx
+│   │   └── api/reviews.api.ts
+│   ├── contract/                   # 전자 근로계약서
+│   │   ├── ContractView.tsx
+│   │   └── api/contracts.api.ts
+│   └── profile/                    # 프로필 / 계좌 / 업그레이드
+│       ├── AccountInfo.tsx
+│       ├── BankAccountCard.tsx
+│       └── UpgradeAccountCard.tsx
 │
-├── shared/                       # 공용 레이어
-│   ├── api/
-│   │   ├── supabase.ts           # Supabase 클라이언트
-│   │   └── realtime.ts
-│   ├── ui/                       # 디자인 시스템
-│   │   ├── Button.tsx
-│   │   ├── Text.tsx              # 시니어 친화 (16pt+)
-│   │   ├── Card.tsx
-│   │   └── tokens.ts             # 색상, 간격, 폰트
-│   ├── hooks/                    # 범용 훅
-│   ├── utils/
-│   └── types/                    # 공용 타입
+├── shared/
+│   ├── api/                        # supabase 클라이언트 + OAuth 래퍼
+│   │   ├── supabase.ts
+│   │   └── oauth.ts
+│   ├── ui/                         # 디자인 시스템
+│   │   ├── Button.tsx  Card.tsx  Input.tsx  Text.tsx
+│   │   ├── ScreenHeader.tsx  StarRating.tsx  RoleSwitcher.tsx
+│   │   └── tokens.ts
+│   ├── hooks/                      # useAuth, useRole, useCountdown
+│   ├── store/MockDataProvider.tsx  # 전역 상태 + Realtime 구독
+│   ├── types/                      # Job, Application, User
+│   └── utils/                      # format, pricing
 │
-├── native/                       # 네이티브 플러그인 래퍼
-│   ├── kakao/                    # 카카오 로그인, 공유
-│   ├── maps/                     # 네이버/카카오맵
-│   └── portone/                  # 결제
+├── supabase/
+│   └── schema/
+│       ├── 001_profiles.sql        # 실제 users 아닌 profiles 중심
+│       ├── 002_jobs.sql
+│       ├── 003_applications.sql
+│       ├── 004_matches_and_reviews.sql
+│       ├── 005_rls_policies.sql
+│       ├── 006_enable_realtime.sql
+│       ├── 007_friendly_default_name.sql
+│       ├── 008_contracts_and_payout.sql
+│       └── _all.sql                # 신규 환경 부트스트랩 (전체 병합)
 │
-├── supabase/                     # 백엔드
-│   ├── schema/                   # DB 마이그레이션
-│   │   ├── 001_users.sql
-│   │   ├── 002_jobs.sql
-│   │   ├── 003_applications.sql
-│   │   ├── 004_matches.sql
-│   │   ├── 005_reviews.sql
-│   │   ├── 006_penalties.sql
-│   │   └── 007_payments.sql
-│   └── functions/                # Edge Functions
-│       ├── match-job/            # 매칭 알고리즘
-│       ├── notify/               # 푸시 발송
-│       ├── settle/               # 정산 처리
-│       └── penalty-calc/         # 페널티 계산
-│
-├── config/                       # 환경 설정
-│   ├── app.config.ts             # Expo 설정
-│   └── env.ts
-│
-└── docs/                         # 문서 (이미 있음)
+├── assets/ (폰트, 이미지)
+└── docs/ (기획·설계·진행 문서)
 ```
+
+**참고**: `features/auth/` · `features/payment/` · `features/penalty/` · `features/notification/` · `native/` · `supabase/functions/` · `config/` 는 **향후 확장 예정**이며 현재는 없음. 인증은 `shared/api/oauth.ts` + `shared/hooks/useAuth.tsx` 로 대체. 결제·페널티·푸시는 아직 Sprint 8/9로 예정.
 
 ### 모듈화 원칙
 
@@ -195,121 +198,30 @@ native/ (플랫폼 통합)
 
 ## 5. 데이터 모델 (Supabase 스키마)
 
-### 핵심 테이블
+**실제 스키마 원본**: `supabase/schema/_all.sql` (번호 파일들을 모두 병합한 신규 환경 부트스트랩용)
 
-```sql
--- users: 사용자 (워커/구인자 공용)
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users,
-  kakao_id TEXT UNIQUE,
-  name TEXT,
-  role TEXT CHECK (role IN ('worker', 'employer', 'both')),
-  phone TEXT,
-  profile_image TEXT,
-  total_rating NUMERIC DEFAULT 0,
-  rating_count INT DEFAULT 0,
-  penalty_points INT DEFAULT 0,
-  penalty_until TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+**현재 테이블 6개 + RLS + Realtime publication**:
 
--- jobs: 일감
-CREATE TABLE jobs (
-  id UUID PRIMARY KEY,
-  employer_id UUID REFERENCES users,
-  title TEXT,
-  description TEXT,
-  category TEXT,
-  location_lat NUMERIC,
-  location_lng NUMERIC,
-  location_address TEXT,
-  start_at TIMESTAMP,
-  end_at TIMESTAMP,
-  hourly_rate INT,
-  required_count INT DEFAULT 1,
-  status TEXT CHECK (status IN ('draft','open','matching','confirmed','in_progress','completed','cancelled')),
-  matching_mode TEXT CHECK (matching_mode IN ('instant','scheduled')),
-  created_at TIMESTAMP DEFAULT NOW()
-);
+- **`profiles`** (auth.users 확장): display_name, 역할별 누적 지표 (worker_total_rating, employer_job_count 등), 페널티 포인트, **계좌 정보** (bank_name/account_number/holder)
+- **`jobs`**: 업무 정보, 위치 좌표, 시간, 시급, requiredCount, 상태, matching_mode, **결제/수수료 필드** (platform_fee_rate, pg_fee_rate, worker_pay, platform_fee, pg_fee, total_amount_charged, escrow_status)
+- **`applications`**: 지원 + 프로필 스냅샷(display_name/rating/job_count), 상태, judge_deadline (지원 접수 시점 + 10분)
+- **`matches`**: 확정된 매칭 기록. 체크인/아웃 시각·좌표, payment_status (`pending → escrow → settled → refunded`), 취소 사유
+- **`reviews`**: 양방향 리뷰. match_id + from_role + 별점 + 코멘트 + 카테고리별 JSON
+- **`contracts`** (신규): 전자 근로계약서. 양측 서명 시각/IP/기기, contract_body (JSON 스냅샷), content_hash, legal_status (`simple_consent` → `certified_identity` → `notarized`)
 
--- applications: 지원
-CREATE TABLE applications (
-  id UUID PRIMARY KEY,
-  job_id UUID REFERENCES jobs,
-  worker_id UUID REFERENCES users,
-  status TEXT CHECK (status IN ('pending','accepted','rejected','auto_cancelled','expired')),
-  applied_at TIMESTAMP DEFAULT NOW(),
-  judged_at TIMESTAMP,
-  judge_deadline TIMESTAMP,  -- Mode 2의 10분 타이머
-  UNIQUE(job_id, worker_id)
-);
+RLS 원칙:
+- `profiles`: 모두 조회 가능, 본인만 수정
+- `jobs`: 모두 조회 가능, 사장님만 등록/수정/삭제
+- `applications`: 본인 지원 or 일감 주인만 조회/수정
+- `matches`: 참여자(사장님+워커)만 조회/수정
+- `reviews`: 모두 조회 가능 (신뢰 시스템), 매칭 참여자만 작성 (수정/삭제 불가)
+- `contracts`: 계약 당사자 양측만 조회/생성/수정
 
--- matches: 확정된 매칭
-CREATE TABLE matches (
-  id UUID PRIMARY KEY,
-  job_id UUID REFERENCES jobs,
-  worker_id UUID REFERENCES users,
-  checked_in_at TIMESTAMP,
-  checked_out_at TIMESTAMP,
-  status TEXT CHECK (status IN ('confirmed','in_progress','completed','cancelled')),
-  cancelled_by TEXT CHECK (cancelled_by IN ('worker','employer','mutual','system')),
-  confirmed_at TIMESTAMP DEFAULT NOW()
-);
-
--- reviews: 양방향 평가
-CREATE TABLE reviews (
-  id UUID PRIMARY KEY,
-  match_id UUID REFERENCES matches,
-  reviewer_id UUID REFERENCES users,
-  reviewee_id UUID REFERENCES users,
-  rating INT CHECK (rating BETWEEN 1 AND 5),
-  comment TEXT,
-  tags JSONB,  -- 카테고리별 평가
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- badges: 스킬 뱃지
-CREATE TABLE badges (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES users,
-  badge_type TEXT,
-  granted_at TIMESTAMP DEFAULT NOW()
-);
-
--- penalties: 페널티 로그
-CREATE TABLE penalties (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES users,
-  points INT,
-  reason TEXT,
-  match_id UUID REFERENCES matches,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- payments: 정산
-CREATE TABLE payments (
-  id UUID PRIMARY KEY,
-  match_id UUID REFERENCES matches,
-  amount INT,
-  platform_fee INT,
-  pg_fee INT,
-  worker_amount INT,
-  status TEXT CHECK (status IN ('escrow','settled','refunded')),
-  portone_tx_id TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- location_tracks: GPS 추적 (임시)
-CREATE TABLE location_tracks (
-  id UUID PRIMARY KEY,
-  match_id UUID REFERENCES matches,
-  worker_id UUID REFERENCES users,
-  lat NUMERIC,
-  lng NUMERIC,
-  recorded_at TIMESTAMP DEFAULT NOW()
-);
--- 30일 후 자동 삭제 (Supabase cron)
-```
+**향후 추가 예정 테이블** (Sprint 9/10에서):
+- `badges` — 스킬 뱃지
+- `penalties` — 페널티 로그
+- `payments` — PortOne 트랜잭션 상세
+- `location_tracks` — 근무 중 GPS 추적 (Sprint 7 4단계)
 
 ### Realtime 구독 전략
 
