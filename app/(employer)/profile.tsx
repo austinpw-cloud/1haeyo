@@ -5,6 +5,8 @@
 
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import { AccountInfo, UpgradeAccountCard } from '@/features/profile';
+import { supabase } from '@/shared/api';
 import { useRole } from '@/shared/hooks';
 import {
   Button,
@@ -19,8 +21,8 @@ export default function EmployerProfileScreen() {
   const router = useRouter();
   const { clearRole } = useRole();
 
-  const handleLogout = () => {
-    // TODO: Supabase signOut (Sprint 1)
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     clearRole();
     router.replace('/(auth)/login');
   };
@@ -29,27 +31,19 @@ export default function EmployerProfileScreen() {
     <View style={styles.container}>
       <ScreenHeader title="프로필" />
 
-      <View style={styles.profileCard}>
-        <View
-          style={[styles.avatar, { backgroundColor: colors.secondary[500] }]}
-        >
-          <Text variant="titleXL" color="inverse">
-            店
-          </Text>
-        </View>
-        <Text variant="titleM" style={styles.name}>
-          테스트 가게
-        </Text>
-        <Text variant="bodyL" color="muted">
-          ⭐ 아직 평가 없음
-        </Text>
-      </View>
+      <AccountInfo />
+
+      <Text variant="bodyL" color="muted" style={styles.ratingLine}>
+        ⭐ 아직 평가 없음
+      </Text>
 
       <Card style={styles.statsRow} elevation="none">
         <Stat value="0" label="채용 횟수" />
         <Stat value="-" label="정산 속도" />
         <Stat value="0" label="단골 일손" />
       </Card>
+
+      <UpgradeAccountCard />
 
       <View style={styles.footer}>
         <Button variant="outline" size="lg" fullWidth onPress={handleLogout}>
@@ -76,20 +70,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.neutral[50],
   },
-  profileCard: {
-    alignItems: 'center',
-    paddingVertical: spacing[8],
-  },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[4],
-  },
-  name: {
-    marginBottom: spacing[1],
+  ratingLine: {
+    textAlign: 'center',
+    marginVertical: spacing[5],
   },
   statsRow: {
     flexDirection: 'row',

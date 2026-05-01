@@ -4,7 +4,13 @@
  */
 
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import {
+  AccountInfo,
+  BankAccountCard,
+  UpgradeAccountCard,
+} from '@/features/profile';
+import { supabase } from '@/shared/api';
 import { useRole } from '@/shared/hooks';
 import {
   Button,
@@ -12,7 +18,6 @@ import {
   colors,
   ScreenHeader,
   spacing,
-  SupabaseStatusBadge,
   Text,
 } from '@/shared/ui';
 
@@ -20,8 +25,8 @@ export default function WorkerProfileScreen() {
   const router = useRouter();
   const { clearRole } = useRole();
 
-  const handleLogout = () => {
-    // TODO: Supabase signOut (Sprint 1)
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     clearRole();
     router.replace('/(auth)/login');
   };
@@ -30,19 +35,12 @@ export default function WorkerProfileScreen() {
     <View style={styles.container}>
       <ScreenHeader title="프로필" />
 
-      <View style={styles.profileCard}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary[500] }]}>
-          <Text variant="titleXL" color="inverse">
-            나
-          </Text>
-        </View>
-        <Text variant="titleM" style={styles.name}>
-          테스트 사용자
-        </Text>
-        <Text variant="bodyL" color="muted">
-          ⭐ 아직 평가 없음
-        </Text>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+      <AccountInfo />
+
+      <Text variant="bodyL" color="muted" style={styles.ratingLine}>
+        ⭐ 아직 평가 없음
+      </Text>
 
       <Card style={styles.statsRow} elevation="none">
         <Stat value="0" label="근무 횟수" />
@@ -50,13 +48,16 @@ export default function WorkerProfileScreen() {
         <Stat value="0" label="뱃지" />
       </Card>
 
-      <SupabaseStatusBadge />
+      <UpgradeAccountCard />
+
+      <BankAccountCard />
 
       <View style={styles.footer}>
         <Button variant="outline" size="lg" fullWidth onPress={handleLogout}>
           로그아웃
         </Button>
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -77,20 +78,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.neutral[50],
   },
-  profileCard: {
-    alignItems: 'center',
-    paddingVertical: spacing[8],
-  },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[4],
-  },
-  name: {
-    marginBottom: spacing[1],
+  ratingLine: {
+    textAlign: 'center',
+    marginVertical: spacing[5],
   },
   statsRow: {
     flexDirection: 'row',
