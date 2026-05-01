@@ -9,13 +9,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Sentry, initSentry } from '@/shared/api';
 import { AuthProvider, RoleProvider } from '@/shared/hooks';
 import { MockDataProvider } from '@/shared/store';
 
-// 폰트 로드 완료 전에 스플래시 자동 숨김 방지
+initSentry();
+
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     'Pretendard-Regular': require('../assets/fonts/Pretendard-Regular.otf'),
     'Pretendard-Medium': require('../assets/fonts/Pretendard-Medium.otf'),
@@ -55,3 +57,5 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);
