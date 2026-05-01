@@ -10,8 +10,8 @@ TARGET_USER: Korean seniors 55–75 with pension gaps and unemployed young adult
 RUNTIME: Node (package manager only) + TypeScript 5.9 (strict); app runs on React Native 0.81.5 / React 19.1 under Expo SDK 54 managed workflow.
 FRONTEND: Expo Router 6 (file-based routing with `(auth)` / `(worker)` / `(employer)` groups and `job/[id]`) + react-native-webview 13 + lucide-react-native 1.8 + Pretendard font family; custom in-repo design system under `shared/ui/` (Button, Card, Input, Text, StarRating, RoleSwitcher).
 BACKEND: Supabase (Postgres + Realtime + Auth) — no custom server; business rules enforced in SQL (RLS + triggers) and in TypeScript API modules under `features/*/api/`.
-DATABASE: Postgres · 6 tables (profiles, jobs, applications, matches, reviews, contracts) · 18 RLS policies · 3 functions · 5 triggers · 5 tables enabled for Realtime (see `supabase/schema/_all.sql`, 442 lines).
-INFRA: EAS Build (`eas.json` with development / preview / production Android APK profiles, `NPM_CONFIG_LEGACY_PEER_DEPS=true`) · no CI (no GitHub Actions, no automated tests) · no public deploy yet.
+DATABASE: Postgres · 6 core tables (profiles, jobs, applications, matches, reviews, contracts) · 30+ RLS policies (gap_estimate=0) · 3 functions · 5 triggers · 6 tables enabled for Realtime · 9 migration files including 009_fk_indexes for join-path coverage (see `supabase/schema/_all.sql`).
+INFRA: EAS Build (`eas.json` with development / preview / production Android APK profiles, `NPM_CONFIG_LEGACY_PEER_DEPS=true`) · GitHub Actions CI present — daily Supabase keepalive workflow at `.github/workflows/supabase-keepalive.yml` (no test jobs yet, gap honestly flagged) · no public deploy yet.
 AI_LAYER: None in the product. Matching is rule-based (radius + hourly_rate + 10-minute judge_deadline), not model-based. No LLM scoring, no embeddings, no recommendation model.
 EXTERNAL_API: Kakao Maps JavaScript SDK (via WebView + postMessage bridge), Supabase Realtime websocket, Google OAuth (live via Supabase); PortOne / Toss Payments and Kakao Login are scaffolded in code but disabled at runtime pending business registration and Kakao business-app review.
 AUTH: Supabase Auth — anonymous session on launch, Google OAuth linking implemented (`shared/api/oauth.ts: signInWithGoogle`, `linkGoogleToAnonymous`); Kakao OAuth code present but gated behind a "준비 중" alert.
@@ -65,7 +65,7 @@ DEPLOYED_URL: ? — no public build yet; EAS is configured for internal APK dist
 GITHUB_URL: https://github.com/austinpw-cloud/1haeyo (repo exists; visibility is private per README, URL itself is public).
 API_ENDPOINTS: Supabase project reference present in `.env` (Seoul region). Not listing the host here because the anon key lives with it and the project is pre-launch; RLS is on but the endpoint is not meant to be shared yet.
 CONTRACT_ADDRESSES: ? — not a crypto project.
-OTHER_EVIDENCE: ? — no users, no transactions, no demo video. Only artifacts are the repo itself, four commits (2026-04-12 → 2026-04-13), and a functional dev build on the maintainer's device. Field test in Bundang is the next verifiable milestone, not yet run.
+OTHER_EVIDENCE: ? — no users, no transactions, no demo video. Only artifacts are the repo itself (commit history through 2026-05-01 spans the initial scaffold, Phase 3 Supabase wiring, payment/contract/location feature work, brand assets, and the new keepalive CI), and a functional dev build on the maintainer's device. Field test in Bundang is the next verifiable milestone, not yet run.
 
 # Next Blocker
 CURRENT_BLOCKER: time + knowledge, not technical. Real payment (PortOne / Toss same-day payout) is blocked on offline paperwork: business registration (사업자등록) and 통신판매업 신고, plus Kakao's business-app review for the `account_email` OAuth scope. The code path for escrow → payout exists as a mock; flipping it on without those filings would violate Korean e-commerce rules.
@@ -76,9 +76,10 @@ PROMPT_VERSION: commit-brief/v1.3
 VERIFIED_CLAIMS:
 - Tech stack versions: `package.json` (Expo 54.0.33, React Native 0.81.5, React 19.1.0, expo-router 6.0.23, @supabase/supabase-js 2.103, react-native-webview 13.15, expo-location 19.0.8, typescript 5.9.2).
 - Route groups and `job/[id].tsx`: verified via `ls app/` and the git status showing `app/(auth)/login.tsx`, `app/(employer)/*`, `app/(worker)/*`, `app/job/[id].tsx`.
-- Schema object counts: `grep` over `supabase/schema/_all.sql` — 6 `create table`, 18 `create policy`, 3 `create .. function`, 5 `create trigger`; plus `006_enable_realtime.sql` and `008_contracts_and_payout.sql` as separate migrations.
+- Schema object counts: `grep` over `supabase/schema/*.sql` — 6 core tables, 30+ distinct RLS policies, 3 functions, 5 triggers, 9 migration files (001–009 plus `_all.sql` bootstrap); 009_fk_indexes covers application_id / reviewer_id / job_id gaps flagged by external audit.
 - EAS profiles: read from `eas.json` (development / preview / production, Android APK, `NPM_CONFIG_LEGACY_PEER_DEPS=true`).
-- Four commits on main, in the listed order and dates: `git log --oneline` (15361d6, 8f6b88f, f3c36b8, 25b0273).
+- CI: `.github/workflows/supabase-keepalive.yml` runs daily at 03:00 UTC against the REST API to prevent free-tier auto-pause; no test jobs yet (honest gap).
+- Commit history on main spans 2026-04-12 → 2026-05-01 — initial scaffold, judgment-timer/lifecycle, Supabase backend integration, brief addition, keepalive CI, and a payment/contract/location feature batch broken into 8 commits on 2026-05-01.
 - OAuth state: `shared/api/oauth.ts` exposes `signInWithGoogle` + `linkGoogleToAnonymous` + `signInWithKakao` + `linkKakaoToAnonymous`; Kakao path is gated (confirmed against the "준비 중" UX mentioned in docs/progress.md).
 - Failure 1 root cause and fix: memory note `reference_kakao_sdk_domain.md` and `features/location/KakaoMapView.tsx` comments both describe the HTTPS-origin workaround.
 - Failure 2: memory note `project_map_strategy.md` explicitly records the earlier AI overcorrection and the user's correction.

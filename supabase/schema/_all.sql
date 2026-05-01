@@ -438,5 +438,18 @@ alter publication supabase_realtime add table public.contracts;
 alter table public.contracts replica identity full;
 
 -- ============================================================================
--- 완료. 테이블 6개 + RLS + Realtime + 트리거 설치됨.
+-- 9. FK 인덱스 (조인 성능 가드)
+-- ============================================================================
+
+create index if not exists idx_matches_application_id
+  on public.matches(application_id);
+
+create index if not exists idx_reviews_reviewer_id
+  on public.reviews(reviewer_id);
+
+create index if not exists idx_reviews_job_id
+  on public.reviews(job_id);
+
+-- ============================================================================
+-- 완료. 테이블 6개 + RLS + Realtime + 트리거 + FK 인덱스 설치됨.
 -- ============================================================================
