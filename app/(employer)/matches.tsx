@@ -7,7 +7,7 @@
 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Users } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApplicantCard } from '@/features/matching';
 import { useAuth } from '@/shared/hooks';
@@ -28,9 +28,16 @@ export default function MatchesScreen() {
     jobs,
     applications,
     updateApplicationStatus,
-    markApplicantsViewed,
-    expireOverdueApplications,
+    refreshJobs,
+    refreshApplications,
   } = useMockData();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshJobs();
+      refreshApplications();
+    }, [refreshJobs, refreshApplications])
+  );
 
   const pendingGroups = useMemo(() => {
     if (!user) return [];
@@ -48,20 +55,7 @@ export default function MatchesScreen() {
       .filter((g) => g.pending.length > 0);
   }, [jobs, applications, user]);
 
-  // 화면 진입 시 각 일감에 대해 "지원자 봤음" 기록 → 10분 타이머 시작
-  useFocusEffect(
-    useCallback(() => {
-      pendingGroups.forEach(({ job }) => markApplicantsViewed(job.id));
-    }, [pendingGroups, markApplicantsViewed])
-  );
-
-  // 5초마다 만료 체크
-  useEffect(() => {
-    const interval = setInterval(() => {
-      expireOverdueApplications();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [expireOverdueApplications]);
+  // 판정 타이머와 만료 처리는 Provider 전역 sweep이 담당.
 
   return (
     <View style={styles.container}>

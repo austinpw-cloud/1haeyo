@@ -39,6 +39,8 @@ function rowToJob(row: JobRow): Job {
     description: row.description ?? undefined,
     category: row.category,
     location: row.location_address,
+    locationLat: row.location_lat ?? undefined,
+    locationLng: row.location_lng ?? undefined,
     // distance는 GPS 연동 후 클라이언트에서 계산
     startAt: row.start_at,
     durationHours: Number(row.duration_hours),
@@ -95,6 +97,8 @@ export async function insertJob(
       description: input.description ?? null,
       category: input.category,
       location_address: input.location,
+      location_lat: input.locationLat ?? null,
+      location_lng: input.locationLng ?? null,
       start_at: input.startAt,
       duration_hours: input.durationHours,
       hourly_rate: input.hourlyRate,
@@ -119,5 +123,19 @@ export async function updateJobStatusDb(
     .from('jobs')
     .update({ status })
     .eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * 시작 시간이 지난 open/matching 공고를 cancelled로 일괄 전환.
+ * 사장님이 판정 안 하고 방치한 공고를 청소.
+ */
+export async function expireOverdueJobsDb(): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('jobs')
+    .update({ status: 'cancelled' })
+    .in('status', ['open', 'matching'])
+    .lt('start_at', now);
   if (error) throw error;
 }

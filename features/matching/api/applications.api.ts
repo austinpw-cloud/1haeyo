@@ -106,19 +106,31 @@ export async function insertApplication(
   workerId: string,
   jobId: string
 ): Promise<Application> {
-  // 현재 프로필 정보 가져와서 스냅샷
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(
-      'display_name, worker_total_rating, worker_rating_count, worker_job_count'
-    )
-    .eq('id', workerId)
-    .maybeSingle();
+  // 프로필 스냅샷 + 일감 시작 시간 (판정 마감 계산에 필요)
+  const [{ data: profile }, { data: jobRow }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'display_name, worker_total_rating, worker_rating_count, worker_job_count'
+      )
+      .eq('id', workerId)
+      .maybeSingle(),
+    supabase.from('jobs').select('start_at').eq('id', jobId).maybeSingle(),
+  ]);
 
   const avgRating =
     profile && profile.worker_rating_count > 0
       ? Number(profile.worker_total_rating) / profile.worker_rating_count
       : 0;
+
+  // 판정 마감 = min(지원 + 10분, 공고 시작 시간)
+  // 사장님이 앱에 안 들어와도 자동으로 만료되도록.
+  const tenMinLaterMs = Date.now() + 10 * 60 * 1000;
+  const startAtMs = jobRow?.start_at
+    ? new Date(jobRow.start_at).getTime()
+    : tenMinLaterMs;
+  const deadlineMs = Math.min(tenMinLaterMs, startAtMs);
+  const judgeDeadline = new Date(deadlineMs).toISOString();
 
   const { data, error } = await supabase
     .from('applications')
@@ -129,6 +141,7 @@ export async function insertApplication(
       snapshot_display_name: profile?.display_name,
       snapshot_rating: avgRating,
       snapshot_job_count: profile?.worker_job_count ?? 0,
+      judge_deadline: judgeDeadline,
     })
     .select(SELECT_WITH_PROFILE)
     .single();
@@ -152,19 +165,10 @@ export async function updateApplicationStatusDb(
   if (error) throw error;
 }
 
-/** 특정 일감의 pending 지원자들에 judge_deadline 세팅 */
-export async function markApplicationsViewedDb(jobId: string): Promise<void> {
-  const deadline = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  const { error } = await supabase
-    .from('applications')
-    .update({ judge_deadline: deadline })
-    .eq('job_id', jobId)
-    .eq('status', 'pending')
-    .is('judge_deadline', null);
-  if (error) throw error;
-}
-
-/** 마감 초과 pending 지원자들 expired 처리 */
+/**
+ * 마감 초과 pending 지원자들 expired 처리.
+ * judge_deadline은 지원 시점에 min(지원+10분, 공고 start_at)으로 이미 세팅되어 있음.
+ */
 export async function expireOverdueApplicationsDb(): Promise<void> {
   const now = new Date().toISOString();
   const { error } = await supabase
